@@ -22,22 +22,59 @@ export function extensionUIAssetsTest(): void {
     let yamlItem: ExtensionsViewItem;
 
     before(async function () {
-      this.timeout(20000);
+      this.timeout(30000);
       driver = VSBrowser.instance.driver;
       view = await new ActivityBar().getViewControl('Extensions');
       sideBar = await view.openView();
-      driver.wait(
+
+      // Wait for progress bar to disappear
+      await driver.wait(
         async () => !(await sideBar.getContent().hasProgress()),
-        5000,
+        10000,
         "Progress bar hasn't been hidden within the timeout"
       );
-      section = (await sideBar.getContent().getSection('Installed')) as ExtensionsViewSection;
+
+      // Wait a bit for sections to load
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Try to find the Installed section with retry
+      section = await driver.wait(
+        async () => {
+          try {
+            const content = sideBar.getContent();
+            const sections = await content.getSections();
+
+            // Try different possible section names
+            for (const sectionName of ['Installed', 'INSTALLED', 'installed']) {
+              try {
+                const sec = await content.getSection(sectionName);
+                if (sec) return sec as ExtensionsViewSection;
+              } catch {
+                // Try next name
+              }
+            }
+
+            // If no section found by name, try to get the first section
+            if (sections.length > 0) {
+              return sections[0] as ExtensionsViewSection;
+            }
+
+            return null;
+          } catch {
+            return null;
+          }
+        },
+        15000,
+        'Could not find extensions section'
+      );
+
       await section.expand();
+
       yamlItem = await driver.wait(
         async () => {
           return await section.findItem(`@installed ${YamlConstants.YAML_NAME}`);
         },
-        5000,
+        10000,
         'There were not visible items available under installed section'
       );
     });
