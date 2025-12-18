@@ -49,15 +49,27 @@ export function customTagsTest(): void {
       await editor.setText('custom');
       await editor.save();
 
-      const contentAssist = await editor.toggleContentAssist(true);
+      await editor.click();
+      await editor.toggleContentAssist(true);
 
-      // find if an item with given label is present in the content assist
-      if (contentAssist instanceof ContentAssist) {
-        const hasItem = await contentAssist.hasItem('customTag1');
-        if (!hasItem) {
-          expect.fail("The 'customTag1' custom tag did not appear in the content assist's suggestion list.");
+      await driver.wait(async () => {
+        try {
+          const widget = await driver.findElement(By.className('suggest-widget'));
+          return await widget.isDisplayed();
+        } catch {
+          return false;
         }
-      } else {
+      }, 5000);
+
+      await driver.wait(async () => {
+        const rows = await driver.findElements(By.css('.suggest-widget .monaco-list-row'));
+        return rows.length > 0;
+      }, 5000);
+
+      const labelEls = await driver.findElements(By.css('.suggest-widget .monaco-list-row .label-name'));
+      const items = await Promise.all(labelEls.map(async (el) => el.getText()));
+
+      if (!items.includes('customTag1')) {
         expect.fail("The 'customTag1' custom tag did not appear in the content assist's suggestion list.");
       }
     });
