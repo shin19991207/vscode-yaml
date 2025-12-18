@@ -15,10 +15,12 @@ export async function dismissBlockingModal(): Promise<void> {
       // On macOS, try clicking "Don't Save" button first
       if (process.platform === 'darwin') {
         try {
-          const dontSaveButtons = await driver.findElements(By.xpath("//a[contains(@class, 'monaco-button') and contains(text(), \"Don't Save\")]"));
+          const dontSaveButtons = await driver.findElements(
+            By.xpath("//a[contains(@class, 'monaco-button') and contains(text(), \"Don't Save\")]")
+          );
           if (dontSaveButtons.length > 0) {
             await dontSaveButtons[0].click();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await new Promise((resolve) => setTimeout(resolve, 300));
             return;
           }
         } catch {
@@ -27,7 +29,7 @@ export async function dismissBlockingModal(): Promise<void> {
       }
       // Fall back to ESC key
       await driver.actions().sendKeys(Key.ESCAPE).perform();
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
   } catch {
     // ignore
@@ -39,13 +41,13 @@ export async function dismissBlockingModal(): Promise<void> {
  */
 export async function forceCloseAllEditors(): Promise<void> {
   const driver = VSBrowser.instance.driver;
-  
+
   // Dismiss any save modals first
   for (let i = 0; i < 3; i++) {
     await dismissBlockingModal();
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  
+
   try {
     await new EditorView().closeAllEditors();
   } catch {
@@ -56,8 +58,8 @@ export async function forceCloseAllEditors(): Promise<void> {
       await driver.actions().keyDown(Key.CONTROL).sendKeys('w').keyUp(Key.CONTROL).perform();
     }
   }
-  
-  await new Promise(resolve => setTimeout(resolve, 500));
+
+  await new Promise((resolve) => setTimeout(resolve, 500));
   await dismissBlockingModal();
 }
 
@@ -67,7 +69,7 @@ export async function forceCloseAllEditors(): Promise<void> {
  */
 export async function createCustomFile(filePath: string): Promise<TextEditor> {
   const driver = VSBrowser.instance.driver;
-  
+
   // First, force close all editors and dismiss any modals to start fresh
   await forceCloseAllEditors();
 
@@ -76,7 +78,7 @@ export async function createCustomFile(filePath: string): Promise<TextEditor> {
   fs.writeFileSync(filePath, '', 'utf8');
 
   const wb = new Workbench();
-  
+
   // Retry opening command prompt if modal blocks it
   let input: InputBox | undefined;
   for (let i = 0; i < 3; i++) {
@@ -88,7 +90,7 @@ export async function createCustomFile(filePath: string): Promise<TextEditor> {
     } catch (e) {
       if (i === 2) throw e;
       await driver.actions().sendKeys(Key.ESCAPE).perform();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }
 
@@ -107,7 +109,7 @@ export async function createCustomFile(filePath: string): Promise<TextEditor> {
 
   const editor = new TextEditor();
   await editor.click(); // ensure focus
-  
+
   // Don't save here - let the test control when to save
   return editor;
 }
