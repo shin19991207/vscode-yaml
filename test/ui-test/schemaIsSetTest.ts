@@ -1,7 +1,7 @@
 import os = require('os');
 import path = require('path');
 import { WebDriver, VSBrowser, EditorView, WebElement } from 'vscode-extension-tester';
-import { createCustomFile, deleteFileInHomeDir, getSchemaLabel } from './util/utility';
+import { createCustomFile, deleteFileInHomeDir, getSchemaLabel, forceCloseAllEditors } from './util/utility';
 import { expect } from 'chai';
 
 /**
@@ -33,7 +33,11 @@ export function schemaIsSetTest(): void {
 
     after(async function () {
       this.timeout(5000);
-      await new EditorView().closeAllEditors();
+      try {
+        await forceCloseAllEditors();
+      } catch {
+        // ignore close failures in cleanup
+      }
       deleteFileInHomeDir(yamlFileName);
     });
   });

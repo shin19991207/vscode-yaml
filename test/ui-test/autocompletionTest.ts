@@ -2,7 +2,7 @@ import os = require('os');
 import path = require('path');
 import { expect } from 'chai';
 import { WebDriver, TextEditor, EditorView, VSBrowser, ContentAssist } from 'vscode-extension-tester';
-import { getSchemaLabel, deleteFileInHomeDir, createCustomFile } from './util/utility';
+import { getSchemaLabel, deleteFileInHomeDir, createCustomFile, forceCloseAllEditors } from './util/utility';
 
 /**
  * @author Zbynek Cervinka <zcervink@redhat.com>
@@ -43,8 +43,14 @@ export function autocompletionTest(): void {
 
     after(async function () {
       this.timeout(5000);
-      await editor.save();
-      await new EditorView().closeAllEditors();
+      try {
+        if (editor) {
+          await editor.save();
+        }
+        await forceCloseAllEditors();
+      } catch {
+        // ignore close failures in cleanup
+      }
       deleteFileInHomeDir(yamlFileName);
     });
   });
