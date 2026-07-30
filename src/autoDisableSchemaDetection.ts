@@ -2,8 +2,8 @@
  *  Copyright (c) IBM Corp. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-import { ConfigurationTarget, extensions, workspace } from 'vscode';
-import type { ExtensionContext, WorkspaceConfiguration } from 'vscode';
+import { extensions, workspace } from 'vscode';
+import type { ConfigurationRequest } from 'vscode-languageclient';
 
 interface AutoDisableSchemaDetectionEntry {
   extensionId: string;
@@ -47,58 +47,30 @@ const autoDisableSchemaDetectionEntries: AutoDisableSchemaDetectionEntry[] = [
   },
 ];
 
-export async function initializeAutoDisableSchemaDetection(context: ExtensionContext): Promise<void> {
-  await updateAutoDisableSchemaDetectionSetting();
-  context.subscriptions.push(
-    extensions.onDidChange(() => {
-      updateAutoDisableSchemaDetectionSetting();
-    }),
-    workspace.onDidChangeConfiguration((event) => {
-      if (
-        event.affectsConfiguration('docker.extension.enableComposeLanguageServer') ||
-        event.affectsConfiguration('yaml.disableSchemaDetection')
-      ) {
-        updateAutoDisableSchemaDetectionSetting();
-      }
-    })
-  );
-}
-
-async function updateAutoDisableSchemaDetectionSetting(): Promise<void> {
-  const configuration = workspace.getConfiguration('yaml');
-  const currentDisableSchemaDetection = getDisableSchemaDetectionSetting(configuration);
-  const update = computeAutoDisableSchemaDetectionUpdate(
-    currentDisableSchemaDetection.value,
-    getAutoDisabledSchemaDetectionExtensions()
-  );
-  if (
-    !(
-      currentDisableSchemaDetection.value.length === update.length &&
-      currentDisableSchemaDetection.value.every((value, index) => value === update[index])
-    )
-  ) {
-    await configuration.update('disableSchemaDetection', update, currentDisableSchemaDetection.target);
+export const applyAutoDisableSchemaDetection: ConfigurationRequest.MiddlewareSignature = async (params, token, configuration) => {
+  const configurations = await configuration(params, token);
+  if (!Array.isArray(configurations)) {
+    return configurations;
   }
-}
+  return configurations.map((configuration, index) => {
+    if (
+      params.items[index]?.section !== 'yaml' ||
+      configuration === null ||
+      typeof configuration !== 'object' ||
+      Array.isArray(configuration)
+    ) {
+      return configuration;
+    }
 
-function getDisableSchemaDetectionSetting(
-  configuration: WorkspaceConfiguration
-): {
-  value: string[];
-  target: ConfigurationTarget;
-} {
-  const inspected = configuration.inspect<string | string[]>('disableSchemaDetection');
-  if (inspected?.workspaceValue !== undefined) {
     return {
-      value: toStringArray(inspected.workspaceValue),
-      target: ConfigurationTarget.Workspace,
+      ...configuration,
+      disableSchemaDetection: computeAutoDisableSchemaDetectionUpdate(
+        configuration.disableSchemaDetection,
+        getAutoDisabledSchemaDetectionExtensions()
+      ),
     };
-  }
-  return {
-    value: toStringArray(inspected?.globalValue ?? []),
-    target: ConfigurationTarget.Global,
-  };
-}
+  });
+};
 
 export function getAutoDisabledSchemaDetectionExtensions(): string[] {
   const configuration = workspace.getConfiguration();
@@ -116,19 +88,13 @@ export function getAutoDisabledSchemaDetectionExtensions(): string[] {
 }
 
 export function computeAutoDisableSchemaDetectionUpdate(
-  currentDisableSchemaDetection: string[],
+  currentDisableSchemaDetection: string | string[],
   enabledExtensions: string[]
 ): string[] {
+  const configuredFileMatches = toStringArray(currentDisableSchemaDetection);
   const desiredFileMatches = getFileMatchesForExtensions(enabledExtensions);
-  const disabledExtensions = autoDisableSchemaDetectionEntries
-    .map((entry) => entry.extensionId)
-    .filter((extensionId) => !enabledExtensions.includes(extensionId));
-  const disabledFileMatches = getFileMatchesForExtensions(disabledExtensions);
-  const withoutInactiveManagedFileMatches = currentDisableSchemaDetection.filter(
-    (fileMatch) => !disabledFileMatches.includes(fileMatch) || desiredFileMatches.includes(fileMatch)
-  );
-  const additions = desiredFileMatches.filter((fileMatch) => !withoutInactiveManagedFileMatches.includes(fileMatch));
-  return withoutInactiveManagedFileMatches.concat(additions);
+  const additions = desiredFileMatches.filter((fileMatch) => !configuredFileMatches.includes(fileMatch));
+  return configuredFileMatches.concat(additions);
 }
 
 function getFileMatchesForExtensions(extensionIds: string[]): string[] {

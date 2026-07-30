@@ -9,6 +9,7 @@
 import { workspace, ExtensionContext, extensions, window, commands, Uri } from 'vscode';
 import {
   CommonLanguageClient,
+  DidChangeConfigurationNotification,
   LanguageClientOptions,
   NotificationType,
   RequestType,
@@ -21,7 +22,7 @@ import { getConflictingExtensions, showUninstallConflictsNotification } from './
 import { TelemetryErrorHandler, TelemetryOutputChannel } from './telemetry';
 import { createJSONSchemaStatusBarItem } from './schema-status-bar-item';
 import { initializeRecommendation } from './recommendation';
-import { initializeAutoDisableSchemaDetection } from './autoDisableSchemaDetection';
+import { applyAutoDisableSchemaDetection } from './autoDisableSchemaDetection';
 
 export interface ISchemaAssociations {
   [pattern: string]: string[];
@@ -141,11 +142,15 @@ export async function startClient(
     initializationOptions: {
       l10nPath,
     },
+    middleware: {
+      workspace: {
+        configuration: applyAutoDisableSchemaDetection,
+      },
+    },
   };
 
   // Create the language client and start it
   client = newLanguageClient('yaml', lsName, clientOptions);
-  await initializeAutoDisableSchemaDetection(context);
 
   const disposable = client.start();
 
@@ -176,6 +181,7 @@ export async function startClient(
 
       // If the extensions change, fire this notification again to pick up on any association changes
       extensions.onDidChange(() => {
+        client.sendNotification(DidChangeConfigurationNotification.type);
         client.sendNotification(SchemaAssociationNotification.type, getSchemaAssociations());
         findConflicts();
       });
