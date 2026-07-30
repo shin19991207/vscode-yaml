@@ -274,6 +274,8 @@ The substrings are matched against the diagnostic messages shown in the VS Code 
 
 Disabling schema validation stops schema-based diagnostics. The file is still parsed as YAML, so YAML syntax errors can still be reported.
 
+When another enabled extension provides more specific YAML support, the YAML Language Support extension automatically disables schema detection at runtime for the relevant file patterns, preventing its own schema-based validation from conflicting with that extension. Built-in integrations include [dbt](https://marketplace.visualstudio.com/items?itemName=dbtLabsInc.dbt), [Docker DX](https://marketplace.visualstudio.com/items?itemName=docker.docker), [GitHub Actions](https://marketplace.visualstudio.com/items?itemName=github.vscode-github-actions), or [Azure Pipelines](https://marketplace.visualstudio.com/items?itemName=ms-azure-devops.azure-pipelines).
+
 ### Using a modeline
 
 Disable schema validation for the current file by setting `$schema` to `none` in a modeline:
